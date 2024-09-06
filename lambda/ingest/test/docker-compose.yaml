@@ -1,0 +1,44 @@
+services:
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.9.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    networks:
+      - es_network
+
+  lambda_ingest:
+    build:
+      context: ../
+      dockerfile: Dockerfile
+    environment:
+      - KAGGLE_USERNAME=$KAGGLE_USERNAME
+      - KAGGLE_KEY=$KAGGLE_KEY
+    ports:
+      - 9000:8080
+    networks:
+      - es_network
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -m unittest test_curl.py"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: test
+    networks:
+      - es_network
+    depends_on:
+      lambda_ingest:
+        condition: service_healthy
+
+
+networks:
+  es_network:
+    driver: bridge
